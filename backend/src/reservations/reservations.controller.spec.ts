@@ -1,3 +1,4 @@
+import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ReservationResponseDto } from './dto/reservation-response.dto';
 import { ReservationsController } from './reservations.controller';
 import { ReservationsService } from './reservations.service';
@@ -14,6 +15,7 @@ describe('ReservationsController', () => {
 
   const reservationsService = {
     findAll: jest.fn<Promise<ReservationResponseDto[]>, []>(),
+    create: jest.fn<Promise<ReservationResponseDto>, [CreateReservationDto]>(),
     cancel: jest.fn<Promise<ReservationResponseDto>, [string]>(),
   };
 
@@ -31,6 +33,20 @@ describe('ReservationsController', () => {
     await expect(controller.findAll()).resolves.toEqual({
       data: [reservation],
     });
+  });
+
+  it('retorna a reserva criada no envelope data', async () => {
+    const payload: CreateReservationDto = {
+      plate: reservation.plate,
+      sectorId: reservation.sectorId,
+      expectedArrivalAt: reservation.expectedArrivalAt,
+    };
+    reservationsService.create.mockResolvedValue(reservation);
+
+    await expect(controller.create(payload)).resolves.toEqual({
+      data: reservation,
+    });
+    expect(reservationsService.create).toHaveBeenCalledWith(payload);
   });
 
   it('retorna a reserva cancelada no envelope data', async () => {

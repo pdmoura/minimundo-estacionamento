@@ -34,13 +34,19 @@ export default function NovoSetorPage() {
       return;
     }
 
-    if (!Number.isInteger(quotaNumber) || quotaNumber < 1) {
+    if (!location.trim()) {
+      setErrorField("location");
+      setError("Informe a localização do setor.");
+      return;
+    }
+
+    if (!quota.trim() || !Number.isInteger(quotaNumber) || quotaNumber < 1) {
       setErrorField("quota");
       setError("A cota de vagas deve ser no mínimo 1.");
       return;
     }
 
-    if (!Number.isFinite(rateNumber) || rateNumber < 0) {
+    if (!hourlyRate.trim() || !Number.isFinite(rateNumber) || rateNumber < 0) {
       setErrorField("hourlyRate");
       setError("A tarifa por hora não pode ser negativa.");
       return;
@@ -52,22 +58,23 @@ export default function NovoSetorPage() {
 
     try {
       await criarSetor({
-        name,
-        location,
+        name: name.trim(),
+        location: location.trim(),
         reservableQuota: quotaNumber,
         hourlyRate: rateNumber,
       });
-
-      setPending(false);
       router.push("/setores");
-    } catch (erro) {
-      setPending(false);
-      if (erro instanceof ErroCadastroSetor) {
-        setErrorField(erro.campo ? (CAMPO_POR_CAMPO_API[erro.campo] ?? "") : "");
-        setError(erro.message);
-        return;
+    } catch (requestError) {
+      if (requestError instanceof ErroCadastroSetor) {
+        setErrorField(
+          requestError.campo ? (CAMPO_POR_CAMPO_API[requestError.campo] ?? "") : "",
+        );
+        setError(requestError.message);
+      } else {
+        setError("Não foi possível conectar ao servidor. Tente novamente.");
       }
-      setError("Não foi possível conectar ao servidor. Tente novamente.");
+    } finally {
+      setPending(false);
     }
   }
 
@@ -94,6 +101,7 @@ export default function NovoSetorPage() {
                 className={`form-control${errorField === "name" ? " is-invalid" : ""}`}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
+                maxLength={100}
               />
             </div>
 
@@ -103,9 +111,10 @@ export default function NovoSetorPage() {
               </label>
               <input
                 id="sector-location"
-                className="form-control"
+                className={`form-control${errorField === "location" ? " is-invalid" : ""}`}
                 value={location}
                 onChange={(event) => setLocation(event.target.value)}
+                maxLength={200}
               />
             </div>
 
@@ -117,6 +126,7 @@ export default function NovoSetorPage() {
                 <input
                   id="sector-quota"
                   type="number"
+                  min="1"
                   className={`form-control${errorField === "quota" ? " is-invalid" : ""}`}
                   value={quota}
                   onChange={(event) => setQuota(event.target.value)}
