@@ -33,6 +33,7 @@ model Sector {
   reservableQuota Int
   availableSpots  Int
   hourlyRate      Decimal         @db.Decimal(10, 2)
+  createdAt       DateTime        @default(now())
   reservations    Reservation[]
   waitlistEntries WaitlistEntry[]
 }
