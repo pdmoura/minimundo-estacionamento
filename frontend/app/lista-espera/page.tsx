@@ -107,7 +107,6 @@ export default function ListaEsperaPage() {
       await entrarNaListaEspera({
         plate,
         sectorId: setor.id,
-        sectorName: setor.nome,
         expectedArrivalAt: new Date(expectedArrivalAt).toISOString(),
       });
       setSucesso("Placa incluída na lista de espera.");

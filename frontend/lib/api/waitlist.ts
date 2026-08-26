@@ -1,15 +1,10 @@
-import { listarSetores } from "@/lib/api/setores";
-import type { JoinWaitlistInput, WaitlistEntry } from "@/lib/reservations/types";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import type { WaitlistEntry } from "@/lib/reservations/types";
+import { listarSetores, type Setor } from "@/lib/api/setores";
 
 type ApiEnvelope<T> = { data: T };
 type ApiErrorEnvelope = {
-  error?: { code?: string; message?: string; fields?: Record<string, string> };
+  error?: { message?: string; fields?: Record<string, string> };
 };
-
-export type WaitlistErro = Error & { field?: string };
 
 type WaitlistEntryApi = {
   id: string;
@@ -20,51 +15,52 @@ type WaitlistEntryApi = {
   createdAt: string;
 };
 
-// O backend não devolve o nome do setor na entrada da fila, só o id. A tela
-// mostra o nome, então resolvemos aqui — mesma abordagem que listarReservas.
-function paraEntrada(
-  entrada: WaitlistEntryApi,
+export type WaitlistErro = Error & { field?: string };
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+function lancarErroApi(body: ApiErrorEnvelope, mensagemPadrao: string): never {
+  const fields = body.error?.fields ?? {};
+  const [primeiroCampo] = Object.keys(fields);
+  const mensagem = primeiroCampo
+    ? fields[primeiroCampo]
+    : body.error?.message ?? mensagemPadrao;
+  const erro = new Error(mensagem) as WaitlistErro;
+  if (primeiroCampo) erro.field = primeiroCampo;
+  throw erro;
+}
+
+function paraWaitlistEntry(
+  entry: WaitlistEntryApi,
   nomesPorSetor: Map<string, string>,
 ): WaitlistEntry {
   return {
-    id: entrada.id,
-    plate: entrada.plate,
-    sectorId: entrada.sectorId,
-    sectorName: nomesPorSetor.get(entrada.sectorId) ?? "—",
-    expectedArrivalAt: entrada.expectedArrivalAt,
-    status: entrada.status,
-    createdAt: entrada.createdAt,
+    id: entry.id,
+    plate: entry.plate,
+    sectorId: entry.sectorId,
+    sectorName: nomesPorSetor.get(entry.sectorId) ?? "Setor",
+    expectedArrivalAt: entry.expectedArrivalAt,
+    status: entry.status,
+    createdAt: entry.createdAt,
   };
 }
 
-async function erroDaResposta(
-  resposta: Response,
-  padrao: string,
-): Promise<WaitlistErro> {
-  let corpo: ApiErrorEnvelope = {};
-  try {
-    corpo = (await resposta.json()) as ApiErrorEnvelope;
-  } catch {
-    // resposta sem corpo JSON — fica na mensagem padrão
-  }
-
-  const erro = new Error(corpo.error?.message ?? padrao) as WaitlistErro;
-  const campos = corpo.error?.fields;
-  if (campos) {
-    const primeiro = Object.keys(campos)[0];
-    if (primeiro) erro.field = primeiro;
-  }
-
-  return erro;
+async function buscarSetoresEMapaDeNomes(): Promise<{
+  setores: Setor[];
+  nomesPorSetor: Map<string, string>;
+}> {
+  const setores = await listarSetores();
+  return {
+    setores,
+    nomesPorSetor: new Map(setores.map((setor) => [setor.id, setor.nome])),
+  };
 }
 
-// A fila é por setor no backend, mas a tela lista o pátio inteiro — daí o
-// fan-out por setor e a concatenação.
 export async function listarListaEspera(): Promise<WaitlistEntry[]> {
-  const setores = await listarSetores();
-  const nomesPorSetor = new Map(setores.map((setor) => [setor.id, setor.nome]));
+  const { setores, nomesPorSetor } = await buscarSetoresEMapaDeNomes();
 
-  const filas = await Promise.all(
+  const listasPorSetor = await Promise.all(
     setores.map(async (setor) => {
       const resposta = await fetch(
         `${API_BASE_URL}/api/sectors/${setor.id}/waitlist`,
@@ -72,22 +68,19 @@ export async function listarListaEspera(): Promise<WaitlistEntry[]> {
       if (!resposta.ok) {
         throw new Error("Não foi possível carregar a lista de espera.");
       }
-
-      const { data } = (await resposta.json()) as ApiEnvelope<
-        WaitlistEntryApi[]
-      >;
-      return data.map((entrada) => paraEntrada(entrada, nomesPorSetor));
+      const { data }: ApiEnvelope<WaitlistEntryApi[]> = await resposta.json();
+      return data.map((entry) => paraWaitlistEntry(entry, nomesPorSetor));
     }),
   );
 
-  return filas
-    .flat()
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return listasPorSetor.flat();
 }
 
-export async function entrarNaListaEspera(
-  input: JoinWaitlistInput,
-): Promise<WaitlistEntry> {
+export async function entrarNaListaEspera(input: {
+  plate: string;
+  sectorId: string;
+  expectedArrivalAt: string;
+}): Promise<WaitlistEntry> {
   const resposta = await fetch(
     `${API_BASE_URL}/api/sectors/${input.sectorId}/waitlist`,
     {
@@ -99,16 +92,22 @@ export async function entrarNaListaEspera(
       }),
     },
   );
+  const body = (await resposta.json()) as
+    | ApiEnvelope<WaitlistEntryApi>
+    | ApiErrorEnvelope;
 
-  if (!resposta.ok) {
-    throw await erroDaResposta(
-      resposta,
+  if (!resposta.ok || !("data" in body)) {
+    lancarErroApi(
+      body as ApiErrorEnvelope,
       "Não foi possível entrar na lista de espera.",
     );
   }
 
-  const { data } = (await resposta.json()) as ApiEnvelope<WaitlistEntryApi>;
-  return paraEntrada(data, new Map([[input.sectorId, input.sectorName]]));
+  const { nomesPorSetor } = await buscarSetoresEMapaDeNomes();
+  return paraWaitlistEntry(
+    (body as ApiEnvelope<WaitlistEntryApi>).data,
+    nomesPorSetor,
+  );
 }
 
 export async function sairDaListaEspera(
@@ -119,14 +118,20 @@ export async function sairDaListaEspera(
     `${API_BASE_URL}/api/sectors/${sectorId}/waitlist/${entryId}/leave`,
     { method: "POST" },
   );
+  const body = (await resposta.json()) as
+    | ApiEnvelope<WaitlistEntryApi>
+    | ApiErrorEnvelope;
 
-  if (!resposta.ok) {
-    throw await erroDaResposta(
-      resposta,
+  if (!resposta.ok || !("data" in body)) {
+    lancarErroApi(
+      body as ApiErrorEnvelope,
       "Não foi possível sair da lista de espera.",
     );
   }
 
-  const { data } = (await resposta.json()) as ApiEnvelope<WaitlistEntryApi>;
-  return paraEntrada(data, new Map());
+  const { nomesPorSetor } = await buscarSetoresEMapaDeNomes();
+  return paraWaitlistEntry(
+    (body as ApiEnvelope<WaitlistEntryApi>).data,
+    nomesPorSetor,
+  );
 }
