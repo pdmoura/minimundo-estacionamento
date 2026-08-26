@@ -1,20 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { listarSetores, type Setor } from "@/lib/api/setores";
 
-const CORES_AVATAR = [
-  "bg-primary",
-  "bg-success",
-  "bg-warning",
-  "bg-secondary",
-  "bg-danger",
-  "bg-info",
-];
-
-function corAvatar(indice: number) {
-  return CORES_AVATAR[indice % CORES_AVATAR.length];
-}
+const money = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+});
 
 export default function SetoresPage() {
   const [setores, setSetores] = useState<Setor[]>([]);
@@ -51,88 +44,83 @@ export default function SetoresPage() {
   }, [setores, busca]);
 
   return (
-    <div className="flex-grow-1 d-flex justify-content-center bg-light px-3 py-5">
-      <main className="w-100" style={{ maxWidth: "960px" }}>
-        <div className="card shadow-sm">
-          <div className="card-header bg-white d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <h1 className="h4 fw-semibold mb-0">Setores</h1>
+    <>
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+          <h1 className="h3 mb-1">Setores</h1>
+          <p className="text-secondary mb-0">
+            Cadastre os setores do estacionamento e acompanhe a estrutura do
+            pátio.
+          </p>
+        </div>
+        <Link href="/setores/novo" className="btn btn-primary">
+          <i className="bi bi-plus-lg me-1" />
+          Novo setor
+        </Link>
+      </div>
 
-            <div className="d-flex align-items-center gap-2">
-              <input
-                type="text"
-                placeholder="Buscar setor..."
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                className="form-control"
-                style={{ width: "220px" }}
-              />
-            </div>
-          </div>
+      <div className="mb-3">
+        <input
+          type="text"
+          placeholder="Buscar setor..."
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          className="form-control"
+          style={{ maxWidth: "280px" }}
+        />
+      </div>
 
-          <div className="table-responsive">
-            {carregando && (
-              <p className="p-4 text-muted mb-0">Carregando setores...</p>
-            )}
+      {!carregando && erroListagem && (
+        <div className="alert alert-danger" role="alert">
+          {erroListagem}
+        </div>
+      )}
 
-            {!carregando && erroListagem && (
-              <p className="p-4 text-danger mb-0">{erroListagem}</p>
-            )}
+      <div className="card shadow-sm border-0">
+        <div className="card-body p-0">
+          {carregando && (
+            <p className="p-4 text-muted mb-0">Carregando setores...</p>
+          )}
 
-            {!carregando && !erroListagem && setoresFiltrados.length === 0 && (
-              <p className="p-4 text-muted mb-0">
+          {!carregando && !erroListagem && setoresFiltrados.length === 0 && (
+            <div className="text-center text-secondary py-5">
+              <i className="bi bi-building fs-1 d-block mb-2" />
+              <p className="mb-0">
                 {setores.length === 0
                   ? "Nenhum setor cadastrado ainda."
                   : "Nenhum setor encontrado para essa busca."}
               </p>
-            )}
+            </div>
+          )}
 
-            {!carregando && !erroListagem && setoresFiltrados.length > 0 && (
-              <table className="table table-hover align-middle mb-0">
-                <thead>
-                  <tr className="text-uppercase small text-muted">
-                    <th className="px-4 py-3">Nome</th>
-                    <th className="px-4 py-3">Localização</th>
-                    <th className="px-4 py-3">Cota total</th>
-                    <th className="px-4 py-3">Tarifa por hora</th>
+          {!carregando && !erroListagem && setoresFiltrados.length > 0 && (
+            <div className="table-responsive">
+              <table className="table align-middle mb-0">
+                <thead className="table-light">
+                  <tr>
+                    <th>Nome</th>
+                    <th>Localização</th>
+                    <th>Cota</th>
+                    <th>Ocupadas</th>
+                    <th>Tarifa/hora</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {setoresFiltrados.map((setor, indice) => (
+                  {setoresFiltrados.map((setor) => (
                     <tr key={setor.id}>
-                      <td className="px-4 py-3">
-                        <div className="d-flex align-items-center gap-2">
-                          <span
-                            className={`d-flex align-items-center justify-content-center rounded-circle text-white fw-semibold ${corAvatar(
-                              indice,
-                            )}`}
-                            style={{
-                              width: "28px",
-                              height: "28px",
-                              fontSize: "0.75rem",
-                            }}
-                          >
-                            {setor.nome.charAt(0).toUpperCase()}
-                          </span>
-                          <span className="fw-medium">{setor.nome}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-secondary">
-                        {setor.localizacao || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-secondary">
-                        {setor.cotaVagas}
-                      </td>
-                      <td className="px-4 py-3 text-secondary">
-                        R$ {setor.tarifaPorHora.toFixed(2)}/h
-                      </td>
+                      <td className="fw-semibold">{setor.nome}</td>
+                      <td>{setor.localizacao || "—"}</td>
+                      <td>{setor.cotaVagas}</td>
+                      <td>{setor.vagasOcupadas}</td>
+                      <td>{money.format(setor.tarifaPorHora)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-      </main>
-    </div>
+      </div>
+    </>
   );
 }

@@ -1,8 +1,67 @@
-html,
-body {
-  min-height: 100%;
+:root {
+  --park-navy: #0d214f;
+  --park-navy-hover: #16326e;
+  --park-active: #1d4ed8;
+  --park-bg: #eef1f6;
+  --park-text: #1e293b;
 }
 
+html,
 body {
+  height: 100%;
+  margin: 0;
+  background: var(--park-bg);
+  color: var(--park-text);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.park-shell {
+  min-height: 100vh;
+}
+
+.park-sidebar {
+  width: 248px;
+  background: var(--park-navy);
+  color: #fff;
+}
+
+.park-brand {
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.park-nav-link {
+  color: rgba(255, 255, 255, 0.72);
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.park-nav-link:hover {
+  color: #fff;
+  background: var(--park-navy-hover);
+}
+
+.park-nav-link.active {
+  color: #fff;
+  background: var(--park-active);
+}
+
+.park-main {
+  background: var(--park-bg);
+}
+
+.park-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
 }
