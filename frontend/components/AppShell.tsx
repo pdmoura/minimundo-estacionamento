@@ -9,7 +9,7 @@ const links = [
   { href: "#", label: "Reservas", icon: "bi-p-circle" },
   { href: "#", label: "Lista de espera", icon: "bi-people" },
   { href: "/ranking", label: "Ranking", icon: "bi-bar-chart", match: "exact" },
-  { href: "#", label: "Histórico", icon: "bi-clock-history" },
+  { href: "/historico", label: "Histórico", icon: "bi-clock-history", match: "prefix" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
