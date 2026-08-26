@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="pt-BR" className={geistSans.variable}>
+    <html lang="pt-BR" className={`${geistSans.variable} h-100`}>
       <body className="h-100">{children}</body>
     </html>
   );

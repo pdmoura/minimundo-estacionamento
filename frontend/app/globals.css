@@ -12,6 +12,7 @@ body {
   margin: 0;
   background: var(--park-bg);
   color: var(--park-text);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
 .park-shell {

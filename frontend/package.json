@@ -9,23 +9,18 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@prisma/client": "^7.10.0",
     "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.1",
     "next": "16.3.3",
     "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "zod": "^4.4.3"
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
-    "prisma": "^8.0.0-rc.11",
-    "tailwindcss": "^4",
     "typescript": "^5"
   }
 }
