@@ -108,7 +108,14 @@ export default function SetoresPage() {
                 <tbody>
                   {setoresFiltrados.map((setor) => (
                     <tr key={setor.id}>
-                      <td className="fw-semibold">{setor.nome}</td>
+                      <td className="fw-semibold">
+                        <Link
+                          href={`/setores/${setor.id}`}
+                          className="text-decoration-none text-reset"
+                        >
+                          {setor.nome}
+                        </Link>
+                      </td>
                       <td>{setor.localizacao || "—"}</td>
                       <td>{setor.cotaVagas}</td>
                       <td>{setor.vagasOcupadas}</td>

@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { criarSetor } from "@/lib/api/setores";
+import { criarSetor, ErroCadastroSetor } from "@/lib/api/setores";
+
+const CAMPO_POR_CAMPO_API: Record<string, string> = {
+  name: "name",
+  location: "location",
+  reservableQuota: "quota",
+  hourlyRate: "hourlyRate",
+};
 
 export default function NovoSetorPage() {
   const router = useRouter();
@@ -58,11 +65,14 @@ export default function NovoSetorPage() {
       });
       router.push("/setores");
     } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Não foi possível conectar ao servidor. Tente novamente.",
-      );
+      if (requestError instanceof ErroCadastroSetor) {
+        setErrorField(
+          requestError.campo ? (CAMPO_POR_CAMPO_API[requestError.campo] ?? "") : "",
+        );
+        setError(requestError.message);
+      } else {
+        setError("Não foi possível conectar ao servidor. Tente novamente.");
+      }
     } finally {
       setPending(false);
     }
