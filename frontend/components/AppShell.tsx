@@ -6,10 +6,25 @@ import { usePathname } from "next/navigation";
 const links = [
   { href: "/", label: "Dashboard", icon: "bi-speedometer2", match: "exact" },
   { href: "/setores", label: "Setores", icon: "bi-building", match: "prefix" },
-  { href: "#", label: "Reservas", icon: "bi-p-circle" },
-  { href: "#", label: "Lista de espera", icon: "bi-people" },
+  {
+    href: "/reservas",
+    label: "Reservas",
+    icon: "bi-p-circle",
+    match: "prefix",
+  },
+  {
+    href: "/lista-espera",
+    label: "Lista de espera",
+    icon: "bi-people",
+    match: "exact",
+  },
   { href: "/ranking", label: "Ranking", icon: "bi-bar-chart", match: "exact" },
-  { href: "#", label: "Histórico", icon: "bi-clock-history" },
+  {
+    href: "/historico",
+    label: "Histórico",
+    icon: "bi-clock-history",
+    match: "prefix",
+  },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -57,14 +72,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-
-        <div className="d-flex align-items-center gap-2 px-1 pt-3 border-top border-light border-opacity-25">
-          <span className="park-avatar bg-primary">AD</span>
-          <div className="lh-sm">
-            <div className="fw-semibold small">Admin</div>
-            <div className="small text-white-50">Administrador</div>
-          </div>
-        </div>
       </aside>
 
       <main className="park-main flex-grow-1 p-4 p-lg-5">{children}</main>
