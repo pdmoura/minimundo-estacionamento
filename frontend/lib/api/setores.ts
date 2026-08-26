@@ -33,7 +33,18 @@ export type CriarSetorInput = {
 };
 
 type ApiEnvelope<T> = { data: T };
-type ApiErrorEnvelope = { error?: { message?: string } };
+type ApiErrorEnvelope = {
+  error?: { message?: string; fields?: Record<string, string> };
+};
+
+export class ErroCadastroSetor extends Error {
+  campo?: string;
+
+  constructor(mensagem: string, campo?: string) {
+    super(mensagem);
+    this.campo = campo;
+  }
+}
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -73,11 +84,15 @@ export async function criarSetor(input: CriarSetorInput): Promise<Setor> {
     | ApiErrorEnvelope;
 
   if (!resposta.ok || !("data" in body)) {
-    throw new Error(
-      "error" in body
-        ? body.error?.message ?? "Não foi possível cadastrar o setor."
-        : "Não foi possível cadastrar o setor.",
-    );
+    if ("error" in body) {
+      const fields = body.error?.fields ?? {};
+      const [primeiroCampo] = Object.keys(fields);
+      const mensagem = primeiroCampo
+        ? fields[primeiroCampo]
+        : body.error?.message ?? "Não foi possível cadastrar o setor.";
+      throw new ErroCadastroSetor(mensagem, primeiroCampo);
+    }
+    throw new ErroCadastroSetor("Não foi possível cadastrar o setor.");
   }
 
   return paraSetor(body.data);
