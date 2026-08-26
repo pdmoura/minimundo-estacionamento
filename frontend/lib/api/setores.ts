@@ -42,6 +42,30 @@ function paraSetor(sector: SectorApi): Setor {
   };
 }
 
+export type NovoSetor = {
+  name: string;
+  location: string;
+  reservableQuota: number;
+  hourlyRate: number;
+};
+
+type ErroValidacaoApi = {
+  error: {
+    code: string;
+    message: string;
+    fields?: Record<string, string>;
+  };
+};
+
+export class ErroCadastroSetor extends Error {
+  campo?: string;
+
+  constructor(mensagem: string, campo?: string) {
+    super(mensagem);
+    this.campo = campo;
+  }
+}
+
 export async function listarSetores(): Promise<Setor[]> {
   const resposta = await fetch(`${API_BASE_URL}/api/sectors`);
   if (!resposta.ok) {
@@ -50,6 +74,27 @@ export async function listarSetores(): Promise<Setor[]> {
 
   const { data }: { data: SectorApi[] } = await resposta.json();
   return data.map(paraSetor);
+}
+
+export async function criarSetor(novoSetor: NovoSetor): Promise<Setor> {
+  const resposta = await fetch(`${API_BASE_URL}/api/sectors`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(novoSetor),
+  });
+
+  if (!resposta.ok) {
+    const corpo: ErroValidacaoApi = await resposta.json().catch(() => ({
+      error: { code: "UNKNOWN", message: "Não foi possível cadastrar o setor." },
+    }));
+    const fields = corpo.error.fields ?? {};
+    const [primeiroCampo] = Object.keys(fields);
+    const mensagem = primeiroCampo ? fields[primeiroCampo] : corpo.error.message;
+    throw new ErroCadastroSetor(mensagem, primeiroCampo);
+  }
+
+  const { data }: { data: SectorApi } = await resposta.json();
+  return paraSetor(data);
 }
 
 export async function obterResumoDashboard(): Promise<ResumoDashboard> {

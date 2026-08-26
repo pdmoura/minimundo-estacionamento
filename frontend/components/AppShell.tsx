@@ -8,7 +8,7 @@ const links = [
   { href: "/setores", label: "Setores", icon: "bi-building", match: "prefix" },
   { href: "#", label: "Reservas", icon: "bi-p-circle" },
   { href: "#", label: "Lista de espera", icon: "bi-people" },
-  { href: "#", label: "Ranking", icon: "bi-bar-chart" },
+  { href: "/ranking", label: "Ranking", icon: "bi-bar-chart", match: "exact" },
   { href: "#", label: "Histórico", icon: "bi-clock-history" },
 ];
 

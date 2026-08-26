@@ -3,6 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { criarSetor, ErroCadastroSetor } from "@/lib/api/setores";
+
+const CAMPO_POR_CAMPO_API: Record<string, string> = {
+  name: "name",
+  location: "location",
+  reservableQuota: "quota",
+  hourlyRate: "hourlyRate",
+};
 
 export default function NovoSetorPage() {
   const router = useRouter();
@@ -43,29 +51,22 @@ export default function NovoSetorPage() {
     setErrorField("");
 
     try {
-      const response = await fetch("/api/sectors", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          location,
-          quota: quotaNumber,
-          hourlyRate: rateNumber,
-        }),
+      await criarSetor({
+        name,
+        location,
+        reservableQuota: quotaNumber,
+        hourlyRate: rateNumber,
       });
 
-      const body = await response.json();
       setPending(false);
-
-      if (!response.ok) {
-        setErrorField(body.field ?? "");
-        setError(body.error ?? "Não foi possível cadastrar o setor.");
+      router.push("/setores");
+    } catch (erro) {
+      setPending(false);
+      if (erro instanceof ErroCadastroSetor) {
+        setErrorField(erro.campo ? (CAMPO_POR_CAMPO_API[erro.campo] ?? "") : "");
+        setError(erro.message);
         return;
       }
-
-      router.push("/setores");
-    } catch {
-      setPending(false);
       setError("Não foi possível conectar ao servidor. Tente novamente.");
     }
   }
