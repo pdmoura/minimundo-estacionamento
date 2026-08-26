@@ -17,6 +17,16 @@ import { ReservationResponseDto } from './dto/reservation-response.dto';
 export class ReservationsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findAll(): Promise<ReservationResponseDto[]> {
+    const reservations = await this.prisma.reservation.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return reservations.map((reservation) =>
+      ReservationResponseDto.fromEntity(reservation),
+    );
+  }
+
   async create(data: CreateReservationDto): Promise<ReservationResponseDto> {
     const expectedArrivalAt = new Date(data.expectedArrivalAt);
 
