@@ -115,3 +115,32 @@ export async function obterResumoDashboard(): Promise<ResumoDashboard> {
     ocupacaoPorSetor: setores,
   };
 }
+
+export type SetorNoRanking = {
+  id: string;
+  nome: string;
+  localizacao: string;
+  totalReservas: number;
+};
+
+type SectorRankingApi = {
+  id: string;
+  name: string;
+  location: string;
+  totalReservations: number;
+};
+
+export async function listarRanking(): Promise<SetorNoRanking[]> {
+  const resposta = await fetch(`${API_BASE_URL}/api/sectors/ranking`);
+  if (!resposta.ok) {
+    throw new Error(`Falha ao buscar o ranking: ${resposta.status}`);
+  }
+
+  const { data }: { data: SectorRankingApi[] } = await resposta.json();
+  return data.map((item) => ({
+    id: item.id,
+    nome: item.name,
+    localizacao: item.location,
+    totalReservas: item.totalReservations,
+  }));
+}
