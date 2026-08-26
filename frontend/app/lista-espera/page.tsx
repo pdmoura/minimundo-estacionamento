@@ -106,7 +106,6 @@ export default function ListaEsperaPage() {
       await entrarNaListaEspera({
         plate,
         sectorId: setor.id,
-        sectorName: setor.nome,
         expectedArrivalAt: new Date(expectedArrivalAt).toISOString(),
       });
       setSucesso("Placa incluída na lista de espera.");
@@ -127,11 +126,11 @@ export default function ListaEsperaPage() {
     }
   }
 
-  async function handleSair(id: string) {
+  async function handleSair(sectorId: string, id: string) {
     setSaindoId(id);
     setErro(null);
     try {
-      await sairDaListaEspera(id);
+      await sairDaListaEspera(sectorId, id);
       setSucesso("Placa removida da lista de espera.");
       await carregar();
     } catch (requestError) {
@@ -276,7 +275,7 @@ export default function ListaEsperaPage() {
                               type="button"
                               className="btn btn-sm btn-outline-danger"
                               disabled={saindoId === entrada.id}
-                              onClick={() => void handleSair(entrada.id)}
+                              onClick={() => void handleSair(entrada.sectorId, entrada.id)}
                             >
                               {saindoId === entrada.id ? "Saindo..." : "Sair da lista"}
                             </button>

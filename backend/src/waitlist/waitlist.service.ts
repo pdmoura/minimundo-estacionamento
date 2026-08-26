@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   HistoryEventType,
+  Prisma,
   ReservationStatus,
   WaitlistStatus,
   type Reservation,
-  type TransactionClient,
   type WaitlistEntry,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -173,7 +173,7 @@ export class WaitlistService {
   }
 
   async promoteFirstWaiting(
-    tx: TransactionClient,
+    tx: Prisma.TransactionClient,
     sectorId: string,
   ): Promise<{ entry: WaitlistEntry; reservation: Reservation } | null> {
     const entry = await tx.waitlistEntry.findFirst({
