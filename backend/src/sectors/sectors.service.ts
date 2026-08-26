@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSectorDto } from './dto/create-sector.dto';
+import { SectorRankingDto } from './dto/sector-ranking.dto';
 import { SectorResponseDto } from './dto/sector-response.dto';
 
 @Injectable()
@@ -13,6 +14,18 @@ export class SectorsService {
     });
 
     return sectors.map((sector) => SectorResponseDto.fromEntity(sector));
+  }
+
+  ranking(): Promise<SectorRankingDto[]> {
+    // LEFT JOIN mantém setor sem reserva com zero; COUNT(r.id) não conta a
+    // linha nula do join; ::int evita o COUNT chegar como string no front.
+    return this.prisma.$queryRaw<SectorRankingDto[]>`
+      SELECT s."id", s."name", s."location", COUNT(r."id")::int AS "totalReservations"
+      FROM "Sector" s
+      LEFT JOIN "Reservation" r ON r."sectorId" = s."id"
+      GROUP BY s."id", s."name", s."location"
+      ORDER BY "totalReservations" DESC, s."name"
+    `;
   }
 
   async create(data: CreateSectorDto): Promise<SectorResponseDto> {
