@@ -1,8 +1,85 @@
 generator client {
   provider = "prisma-client"
-  output   = "../generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum WaitlistStatus {
+  WAITING
+  PROMOTED
+  LEFT
+}
+
+enum HistoryEventType {
+  RESERVATION_CREATED
+  RESERVATION_CANCELLED
+  WAITLIST_JOINED
+  WAITLIST_LEFT
+  WAITLIST_PROMOTED
+}
+
+model Sector {
+  id              String          @id @default(uuid()) @db.Uuid
+  name            String
+  location        String
+  reservableQuota Int
+  availableSpots  Int
+  hourlyRate      Decimal         @db.Decimal(10, 2)
+  createdAt       DateTime        @default(now())
+  reservations    Reservation[]
+  waitlistEntries WaitlistEntry[]
+}
+
+model Reservation {
+  id                String            @id @default(uuid()) @db.Uuid
+  plate             String
+  sectorId          String            @db.Uuid
+  expectedArrivalAt DateTime
+  status            ReservationStatus @default(ACTIVE)
+  createdAt         DateTime          @default(now())
+  sector            Sector            @relation(fields: [sectorId], references: [id])
+  historyEvents     HistoryEvent[]
+
+  @@index([plate])
+  @@index([sectorId])
+}
+
+model WaitlistEntry {
+  id                String         @id @default(uuid()) @db.Uuid
+  plate             String
+  sectorId          String         @db.Uuid
+  expectedArrivalAt DateTime
+  status            WaitlistStatus @default(WAITING)
+  createdAt         DateTime       @default(now())
+  sector            Sector         @relation(fields: [sectorId], references: [id])
+  historyEvents     HistoryEvent[]
+
+  @@index([plate])
+  @@index([sectorId])
+  @@index([sectorId, createdAt])
+}
+
+model HistoryEvent {
+  id                String           @id @default(uuid()) @db.Uuid
+  type              HistoryEventType
+  occurredAt        DateTime         @default(now())
+  reservationId     String?          @db.Uuid
+  waitlistEntryId   String?          @db.Uuid
+  originEventId     String?          @db.Uuid
+  reservation       Reservation?     @relation(fields: [reservationId], references: [id])
+  waitlistEntry     WaitlistEntry?   @relation(fields: [waitlistEntryId], references: [id])
+  originEvent       HistoryEvent?    @relation("HistoryEventOrigin", fields: [originEventId], references: [id])
+  originatingEvents HistoryEvent[]   @relation("HistoryEventOrigin")
+
+  @@index([reservationId])
+  @@index([waitlistEntryId])
+  @@index([occurredAt])
 }
