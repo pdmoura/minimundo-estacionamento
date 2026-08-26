@@ -15,7 +15,10 @@ describe('WaitlistController', () => {
     createdAt: '2026-08-26T14:00:00.000Z',
   };
   const waitlistService = {
-    join: jest.fn<Promise<WaitlistEntryResponseDto>, [string, CreateWaitlistEntryDto]>(),
+    join: jest.fn<
+      Promise<WaitlistEntryResponseDto>,
+      [string, CreateWaitlistEntryDto]
+    >(),
     findAll: jest.fn<Promise<WaitlistEntryResponseDto[]>, [string]>(),
     leave: jest.fn<Promise<WaitlistEntryResponseDto>, [string, string]>(),
   };

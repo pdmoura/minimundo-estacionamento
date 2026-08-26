@@ -1,4 +1,7 @@
-import type { WaitlistEntry, WaitlistStatus } from '../../generated/prisma/client';
+import type {
+  WaitlistEntry,
+  WaitlistStatus,
+} from '../../generated/prisma/client';
 
 export class WaitlistEntryResponseDto {
   id: string;
