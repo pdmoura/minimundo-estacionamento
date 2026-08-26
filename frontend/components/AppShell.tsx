@@ -6,10 +6,25 @@ import { usePathname } from "next/navigation";
 const links = [
   { href: "/", label: "Dashboard", icon: "bi-speedometer2", match: "exact" },
   { href: "/setores", label: "Setores", icon: "bi-building", match: "prefix" },
-  { href: "/reservas", label: "Reservas", icon: "bi-p-circle", match: "prefix" },
-  { href: "#", label: "Lista de espera", icon: "bi-people" },
+  {
+    href: "/reservas",
+    label: "Reservas",
+    icon: "bi-p-circle",
+    match: "prefix",
+  },
+  {
+    href: "/lista-espera",
+    label: "Lista de espera",
+    icon: "bi-people",
+    match: "exact",
+  },
   { href: "/ranking", label: "Ranking", icon: "bi-bar-chart", match: "exact" },
-  { href: "/historico", label: "Histórico", icon: "bi-clock-history", match: "prefix" },
+  {
+    href: "/historico",
+    label: "Histórico",
+    icon: "bi-clock-history",
+    match: "prefix",
+  },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

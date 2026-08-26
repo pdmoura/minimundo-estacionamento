@@ -1,12 +1,15 @@
 import type {
   CreateReservationInput,
   HistoryEvent,
+  JoinWaitlistInput,
   Reservation,
+  WaitlistEntry,
 } from "./types";
 
 const remainingBySector = new Map<string, number>();
 const reservations: Reservation[] = [];
 const historyEvents: HistoryEvent[] = [];
+const waitlistEntries: WaitlistEntry[] = [];
 
 function hoursAgo(hours: number) {
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
@@ -252,16 +255,144 @@ export function cancelReservation(id: string): Reservation {
   }
 
   reservation.status = "CANCELLED";
-  remainingBySector.set(
-    reservation.sectorId,
-    (remainingBySector.get(reservation.sectorId) ?? 0) + 1,
-  );
-  addEvent({
+  const now = new Date().toISOString();
+  const cancelamento = addEvent({
     type: "RESERVATION_CANCELLED",
-    occurredAt: new Date().toISOString(),
+    occurredAt: now,
     reservationId: reservation.id,
     description: "Reserva cancelada.",
   });
 
+  const proximo = waitlistEntries
+    .filter(
+      (entry) => entry.sectorId === reservation.sectorId && entry.status === "WAITING",
+    )
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0];
+
+  if (proximo) {
+    proximo.status = "PROMOTED";
+    const promovida: Reservation = {
+      id: crypto.randomUUID(),
+      plate: proximo.plate,
+      sectorId: proximo.sectorId,
+      sectorName: proximo.sectorName,
+      expectedArrivalAt: proximo.expectedArrivalAt,
+      status: "ACTIVE",
+      createdAt: now,
+    };
+    reservations.push(promovida);
+    addEvent({
+      type: "WAITLIST_PROMOTED",
+      occurredAt: now,
+      reservationId: promovida.id,
+      waitlistEntryId: proximo.id,
+      originEventId: cancelamento.id,
+      description: `Promovido da lista de espera a partir do cancelamento da placa ${reservation.plate}.`,
+    });
+  } else {
+    remainingBySector.set(
+      reservation.sectorId,
+      (remainingBySector.get(reservation.sectorId) ?? 0) + 1,
+    );
+  }
+
   return reservation;
+}
+
+export function listWaitlist(sectorId?: string): WaitlistEntry[] {
+  return waitlistEntries
+    .filter((entry) => entry.status === "WAITING")
+    .filter((entry) => !sectorId || entry.sectorId === sectorId)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+}
+
+export function joinWaitlist(input: JoinWaitlistInput): WaitlistEntry {
+  const plate = input.plate.trim().toUpperCase();
+  const expectedArrivalAt = new Date(input.expectedArrivalAt);
+
+  if (!plate) {
+    throw Object.assign(new Error("Informe a placa."), { field: "plate" });
+  }
+
+  if (Number.isNaN(expectedArrivalAt.getTime())) {
+    throw Object.assign(new Error("Informe a data/hora prevista."), {
+      field: "expectedArrivalAt",
+    });
+  }
+
+  if (expectedArrivalAt.getTime() < Date.now()) {
+    throw Object.assign(
+      new Error("A data/hora prevista não pode estar no passado."),
+      { field: "expectedArrivalAt" },
+    );
+  }
+
+  const hasActiveReservation = reservations.some(
+    (item) => item.plate === plate && item.status === "ACTIVE",
+  );
+  if (hasActiveReservation) {
+    throw Object.assign(
+      new Error("Esta placa já possui uma reserva ativa."),
+      { field: "plate" },
+    );
+  }
+
+  const hasWaitlistEntry = waitlistEntries.some(
+    (entry) =>
+      entry.plate === plate &&
+      entry.sectorId === input.sectorId &&
+      entry.status === "WAITING",
+  );
+  if (hasWaitlistEntry) {
+    throw Object.assign(
+      new Error("Esta placa já está na lista de espera deste setor."),
+      { field: "plate" },
+    );
+  }
+
+  const now = new Date().toISOString();
+  const entry: WaitlistEntry = {
+    id: crypto.randomUUID(),
+    plate,
+    sectorId: input.sectorId,
+    sectorName: input.sectorName,
+    expectedArrivalAt: expectedArrivalAt.toISOString(),
+    status: "WAITING",
+    createdAt: now,
+  };
+
+  waitlistEntries.push(entry);
+  addEvent({
+    type: "WAITLIST_JOINED",
+    occurredAt: now,
+    waitlistEntryId: entry.id,
+    description: "Entrou na lista de espera.",
+  });
+
+  return entry;
+}
+
+export function leaveWaitlist(id: string): WaitlistEntry {
+  const entry = waitlistEntries.find((item) => item.id === id);
+  if (!entry) {
+    throw Object.assign(new Error("Registro na lista de espera não encontrado."), {
+      status: 404,
+    });
+  }
+  if (entry.status !== "WAITING") {
+    throw Object.assign(
+      new Error("Só é possível sair de um registro que está aguardando."),
+      { field: "status" },
+    );
+  }
+
+  entry.status = "LEFT";
+  addEvent({
+    type: "WAITLIST_LEFT",
+    occurredAt: new Date().toISOString(),
+    waitlistEntryId: entry.id,
+    description: "Saiu voluntariamente da lista de espera.",
+  });
+
+  return entry;
 }

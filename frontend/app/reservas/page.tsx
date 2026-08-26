@@ -20,12 +20,7 @@ export default function ReservasPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("criada") === "1") {
-      const vagas = params.get("vagas");
-      setSucesso(
-        vagas != null
-          ? `Reserva registrada. Cota disponível do setor: ${vagas}.`
-          : "Reserva registrada.",
-      );
+      setSucesso("Reserva registrada.");
     }
   }, []);
 

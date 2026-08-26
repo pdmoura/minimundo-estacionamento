@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { cancelReservation } from "@/lib/reservations/store";
+import { leaveWaitlist } from "@/lib/reservations/store";
 
 export async function POST(
   _request: Request,
@@ -9,11 +9,13 @@ export async function POST(
   const { id } = await context.params;
 
   try {
-    const reservation = cancelReservation(id);
-    return NextResponse.json({ data: reservation });
+    const entry = leaveWaitlist(id);
+    return NextResponse.json({ data: entry });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Não foi possível cancelar a reserva.";
+      error instanceof Error
+        ? error.message
+        : "Não foi possível sair da lista de espera.";
     const status =
       error instanceof Error && "status" in error
         ? Number((error as { status?: number }).status) || 400

@@ -2,24 +2,114 @@ import type { HistoryEvent, Reservation } from "@/lib/reservations/types";
 import { listarSetores, type Setor } from "@/lib/api/setores";
 
 type ApiEnvelope<T> = { data: T };
-type ApiError = { error?: string; field?: string };
-type CreateResponse = ApiEnvelope<Reservation> & { availableSpots?: number };
+type ApiErrorEnvelope = {
+  error?: { message?: string; fields?: Record<string, string> };
+};
+
+type ReservationApi = {
+  id: string;
+  plate: string;
+  sectorId: string;
+  expectedArrivalAt: string;
+  status: Reservation["status"];
+  createdAt: string;
+};
 
 export type ReservaErro = Error & { field?: string };
 
-async function parseJson<T>(resposta: Response): Promise<T> {
-  return (await resposta.json()) as T;
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+function lancarErroApi(body: ApiErrorEnvelope, mensagemPadrao: string): never {
+  const fields = body.error?.fields ?? {};
+  const [primeiroCampo] = Object.keys(fields);
+  const mensagem = primeiroCampo
+    ? fields[primeiroCampo]
+    : body.error?.message ?? mensagemPadrao;
+  const erro = new Error(mensagem) as ReservaErro;
+  if (primeiroCampo) erro.field = primeiroCampo;
+  throw erro;
+}
+
+function paraReservation(
+  reservation: ReservationApi,
+  nomesPorSetor: Map<string, string>,
+): Reservation {
+  return {
+    id: reservation.id,
+    plate: reservation.plate,
+    sectorId: reservation.sectorId,
+    sectorName: nomesPorSetor.get(reservation.sectorId) ?? "Setor",
+    expectedArrivalAt: reservation.expectedArrivalAt,
+    status: reservation.status,
+    createdAt: reservation.createdAt,
+  };
 }
 
 export async function listarReservas(): Promise<Reservation[]> {
-  const resposta = await fetch("/api/reservations");
-  if (!resposta.ok) {
+  const [respostaReservas, setores] = await Promise.all([
+    fetch(`${API_BASE_URL}/api/reservations`),
+    listarSetores(),
+  ]);
+
+  if (!respostaReservas.ok) {
     throw new Error("Não foi possível carregar as reservas.");
   }
-  const { data } = await parseJson<ApiEnvelope<Reservation[]>>(resposta);
-  return data;
+
+  const nomesPorSetor = new Map(setores.map((setor) => [setor.id, setor.nome]));
+  const { data }: ApiEnvelope<ReservationApi[]> = await respostaReservas.json();
+  return data.map((reservation) => paraReservation(reservation, nomesPorSetor));
 }
 
+export async function criarReserva(input: {
+  plate: string;
+  sectorId: string;
+  expectedArrivalAt: string;
+}): Promise<Reservation> {
+  const resposta = await fetch(`${API_BASE_URL}/api/reservations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const body = (await resposta.json()) as
+    | ApiEnvelope<ReservationApi>
+    | ApiErrorEnvelope;
+
+  if (!resposta.ok || !("data" in body)) {
+    lancarErroApi(body as ApiErrorEnvelope, "Não foi possível registrar a reserva.");
+  }
+
+  const setores = await listarSetores();
+  const nomesPorSetor = new Map(setores.map((setor) => [setor.id, setor.nome]));
+  return paraReservation((body as ApiEnvelope<ReservationApi>).data, nomesPorSetor);
+}
+
+export async function cancelarReserva(id: string): Promise<Reservation> {
+  const resposta = await fetch(`${API_BASE_URL}/api/reservations/${id}/cancel`, {
+    method: "POST",
+  });
+  const body = (await resposta.json()) as
+    | ApiEnvelope<ReservationApi>
+    | ApiErrorEnvelope;
+
+  if (!resposta.ok || !("data" in body)) {
+    lancarErroApi(body as ApiErrorEnvelope, "Não foi possível cancelar a reserva.");
+  }
+
+  const setores = await listarSetores();
+  const nomesPorSetor = new Map(setores.map((setor) => [setor.id, setor.nome]));
+  return paraReservation((body as ApiEnvelope<ReservationApi>).data, nomesPorSetor);
+}
+
+export async function listarSetoresReserva(): Promise<Setor[]> {
+  return listarSetores();
+}
+
+/**
+ * O backend ainda não expõe GET /reservations/:id/history nesta branch —
+ * continua servido pelo mock local (app/api/reservations/[id]/history)
+ * até esse endpoint ser trazido de feat/estc5-reservation-history.
+ */
 export async function obterHistorico(id: string): Promise<{
   reservation: Reservation;
   events: HistoryEvent[];
@@ -31,84 +121,7 @@ export async function obterHistorico(id: string): Promise<{
   if (!resposta.ok) {
     throw new Error("Não foi possível carregar o histórico.");
   }
-  return (await parseJson<ApiEnvelope<{ reservation: Reservation; events: HistoryEvent[] }>>(
-    resposta,
-  )).data;
-}
-
-export async function criarReserva(input: {
-  plate: string;
-  sectorId: string;
-  sectorName: string;
-  expectedArrivalAt: string;
-  availableSpots: number;
-}): Promise<{ reservation: Reservation; availableSpots: number }> {
-  const resposta = await fetch("/api/reservations", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  const body = await parseJson<CreateResponse | ApiError>(resposta);
-
-  if (!resposta.ok || !("data" in body)) {
-    const erro = new Error(
-      "error" in body
-        ? body.error ?? "Não foi possível registrar a reserva."
-        : "Não foi possível registrar a reserva.",
-    ) as ReservaErro;
-    if ("field" in body) erro.field = body.field;
-    throw erro;
-  }
-
-  return {
-    reservation: body.data,
-    availableSpots: body.availableSpots ?? 0,
-  };
-}
-
-export async function cancelarReserva(id: string): Promise<Reservation> {
-  const resposta = await fetch(`/api/reservations/${id}/cancel`, {
-    method: "POST",
-  });
-  const body = await parseJson<ApiEnvelope<Reservation> | ApiError>(resposta);
-
-  if (!resposta.ok || !("data" in body)) {
-    throw new Error(
-      "error" in body
-        ? body.error ?? "Não foi possível cancelar a reserva."
-        : "Não foi possível cancelar a reserva.",
-    );
-  }
-
-  return body.data;
-}
-
-export async function listarSetoresReserva(): Promise<Setor[]> {
-  try {
-    const setores = await Promise.race([
-      listarSetores(),
-      new Promise<Setor[]>((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), 1500),
-      ),
-    ]);
-    if (setores.length > 0) return setores;
-  } catch {
-    // usa o stub local quando o Nest não estiver disponível
-  }
-
-  const resposta = await fetch("/api/reservation-sectors");
-  if (!resposta.ok) {
-    throw new Error("Não foi possível carregar os setores.");
-  }
-  const { data } = await parseJson<
-    ApiEnvelope<{ id: string; name: string; availableSpots: number }[]>
-  >(resposta);
-  return data.map((setor) => ({
-    id: setor.id,
-    nome: setor.name,
-    localizacao: "",
-    cotaVagas: setor.availableSpots,
-    vagasOcupadas: 0,
-    tarifaPorHora: 0,
-  }));
+  const { data }: ApiEnvelope<{ reservation: Reservation; events: HistoryEvent[] }> =
+    await resposta.json();
+  return data;
 }

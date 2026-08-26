@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 
-import {
-  createReservation,
-  getAvailableSpots,
-  listReservations,
-} from "@/lib/reservations/store";
+import { joinWaitlist, listWaitlist } from "@/lib/reservations/store";
 
-export async function GET() {
-  return NextResponse.json({ data: listReservations() });
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const sectorId = searchParams.get("sectorId") ?? undefined;
+  return NextResponse.json({ data: listWaitlist(sectorId) });
 }
 
 export async function POST(request: Request) {
@@ -17,7 +15,6 @@ export async function POST(request: Request) {
   const sectorName = typeof body.sectorName === "string" ? body.sectorName : "";
   const expectedArrivalAt =
     typeof body.expectedArrivalAt === "string" ? body.expectedArrivalAt : "";
-  const availableSpots = Number(body.availableSpots);
 
   if (!sectorId.trim()) {
     return NextResponse.json(
@@ -27,23 +24,18 @@ export async function POST(request: Request) {
   }
 
   try {
-    const reservation = createReservation({
+    const entry = joinWaitlist({
       plate,
       sectorId,
       sectorName: sectorName.trim() || "Setor",
       expectedArrivalAt,
-      availableSpots: Number.isFinite(availableSpots) ? availableSpots : 0,
     });
-    return NextResponse.json(
-      {
-        data: reservation,
-        availableSpots: getAvailableSpots(sectorId) ?? 0,
-      },
-      { status: 201 },
-    );
+    return NextResponse.json({ data: entry }, { status: 201 });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Não foi possível registrar a reserva.";
+      error instanceof Error
+        ? error.message
+        : "Não foi possível entrar na lista de espera.";
     const field =
       error instanceof Error && "field" in error
         ? String((error as { field?: string }).field ?? "")

@@ -75,14 +75,12 @@ export default function NovaReservaPage() {
     setErrorField("");
 
     try {
-      const { availableSpots } = await criarReserva({
+      await criarReserva({
         plate,
         sectorId: setor.id,
-        sectorName: setor.nome,
         expectedArrivalAt: new Date(expectedArrivalAt).toISOString(),
-        availableSpots: vagasDisponiveis(setor),
       });
-      router.push(`/reservas?criada=1&vagas=${availableSpots}`);
+      router.push("/reservas?criada=1");
     } catch (requestError) {
       const erro = requestError as ReservaErro;
       setErrorField(erro.field ?? "");
