@@ -11,13 +11,17 @@ import {
   type Reservation,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { WaitlistService } from '../waitlist/waitlist.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { HistoryEventResponseDto } from './dto/history-event-response.dto';
 import { ReservationResponseDto } from './dto/reservation-response.dto';
 
 @Injectable()
 export class ReservationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly waitlistService: WaitlistService,
+  ) {}
 
   async findAll(): Promise<ReservationResponseDto[]> {
     const reservations = await this.prisma.reservation.findMany({
@@ -136,11 +140,17 @@ export class ReservationsService {
       }
 
       const updated = updatedReservations[0];
+      const promotion = await this.waitlistService.promoteFirstWaiting(
+        tx,
+        updated.sectorId,
+      );
 
-      await tx.sector.update({
-        where: { id: updated.sectorId },
-        data: { availableSpots: { increment: 1 } },
-      });
+      if (!promotion) {
+        await tx.sector.update({
+          where: { id: updated.sectorId },
+          data: { availableSpots: { increment: 1 } },
+        });
+      }
 
       await tx.historyEvent.create({
         data: {
