@@ -11,11 +11,22 @@ import {
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
+import { HistoryEventResponseDto } from './dto/history-event-response.dto';
 import { ReservationResponseDto } from './dto/reservation-response.dto';
 
 @Injectable()
 export class ReservationsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async findAll(): Promise<ReservationResponseDto[]> {
+    const reservations = await this.prisma.reservation.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return reservations.map((reservation) =>
+      ReservationResponseDto.fromEntity(reservation),
+    );
+  }
 
   async create(data: CreateReservationDto): Promise<ReservationResponseDto> {
     const expectedArrivalAt = new Date(data.expectedArrivalAt);
@@ -144,5 +155,26 @@ export class ReservationsService {
     });
 
     return ReservationResponseDto.fromEntity(reservation);
+  }
+
+  async getHistory(id: string): Promise<HistoryEventResponseDto[]> {
+    const reservation = await this.prisma.reservation.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!reservation) {
+      throw new NotFoundException({
+        code: 'RESERVATION_NOT_FOUND',
+        message: 'Reserva não encontrada.',
+      });
+    }
+
+    const events = await this.prisma.historyEvent.findMany({
+      where: { reservationId: id },
+      orderBy: { occurredAt: 'asc' },
+    });
+
+    return events.map((event) => HistoryEventResponseDto.fromEntity(event));
   }
 }
