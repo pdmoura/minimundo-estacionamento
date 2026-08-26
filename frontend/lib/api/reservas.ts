@@ -109,11 +109,6 @@ export async function listarSetoresReserva(): Promise<Setor[]> {
   return listarSetores();
 }
 
-/**
- * O backend ainda não expõe GET /reservations/:id/history nesta branch —
- * continua servido pelo mock local (app/api/reservations/[id]/history)
- * até esse endpoint ser trazido de feat/estc5-reservation-history.
- */
 type HistoryEventApi = {
   id: string;
   type: HistoryEventType;
