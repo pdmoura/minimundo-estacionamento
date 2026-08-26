@@ -1,15 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import type {
+  ApiErrorResponse,
+  ApiResponse,
+  CreateSectorPayload,
+  Sector,
+} from "@/lib/sectors/types";
 
-type Sector = {
-  id: string;
-  name: string;
-  location: string;
-  quota: number;
-  availableQuota: number;
-  hourlyRate: number;
-};
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
 
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -21,25 +21,59 @@ export default function Home() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
-  const [quota, setQuota] = useState("");
+  const [reservableQuota, setReservableQuota] = useState("");
   const [hourlyRate, setHourlyRate] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [error, setError] = useState("");
   const [errorField, setErrorField] = useState("");
   const [success, setSuccess] = useState("");
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    fetch("/api/sectors")
-      .then((response) => response.json())
-      .then(setSectors)
-      .catch(() => setError("Não foi possível carregar os setores."));
+    const controller = new AbortController();
+
+    async function loadSectors() {
+      try {
+        const response = await fetch(`${apiUrl}/sectors`, {
+          signal: controller.signal,
+        });
+        const body = (await response.json()) as
+          | ApiResponse<Sector[]>
+          | ApiErrorResponse;
+
+        if (!response.ok || !("data" in body)) {
+          throw new Error(
+            "error" in body
+              ? body.error.message
+              : "Não foi possível carregar os setores.",
+          );
+        }
+
+        setSectors(body.data);
+        setLoadError("");
+      } catch (requestError) {
+        if (requestError instanceof Error && requestError.name === "AbortError") {
+          return;
+        }
+
+        setLoadError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Não foi possível carregar os setores.",
+        );
+      }
+    }
+
+    void loadSectors();
+
+    return () => controller.abort();
   }, []);
 
   function closeModal() {
     setOpen(false);
     setName("");
     setLocation("");
-    setQuota("");
+    setReservableQuota("");
     setHourlyRate("");
     setError("");
     setErrorField("");
@@ -48,7 +82,7 @@ export default function Home() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const quotaNumber = Number(quota);
+    const quotaNumber = Number(reservableQuota);
     const rateNumber = Number(hourlyRate);
 
     if (!name.trim()) {
@@ -57,13 +91,23 @@ export default function Home() {
       return;
     }
 
-    if (!Number.isInteger(quotaNumber) || quotaNumber < 1) {
-      setErrorField("quota");
+    if (!location.trim()) {
+      setErrorField("location");
+      setError("Informe a localização do setor.");
+      return;
+    }
+
+    if (
+      !reservableQuota.trim() ||
+      !Number.isInteger(quotaNumber) ||
+      quotaNumber < 1
+    ) {
+      setErrorField("reservableQuota");
       setError("A cota de vagas deve ser no mínimo 1.");
       return;
     }
 
-    if (!Number.isFinite(rateNumber) || rateNumber < 0) {
+    if (!hourlyRate.trim() || !Number.isFinite(rateNumber) || rateNumber < 0) {
       setErrorField("hourlyRate");
       setError("A tarifa por hora não pode ser negativa.");
       return;
@@ -74,32 +118,36 @@ export default function Home() {
     setErrorField("");
 
     try {
-      const response = await fetch("/api/sectors", {
+      const payload: CreateSectorPayload = {
+        name: name.trim(),
+        location: location.trim(),
+        reservableQuota: quotaNumber,
+        hourlyRate: rateNumber,
+      };
+      const response = await fetch(`${apiUrl}/sectors`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          location,
-          quota: quotaNumber,
-          hourlyRate: rateNumber,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      const body = await response.json();
-      setPending(false);
+      const body = (await response.json()) as
+        | ApiResponse<Sector>
+        | ApiErrorResponse;
 
-      if (!response.ok) {
-        setErrorField(body.field ?? "");
-        setError(body.error ?? "Não foi possível cadastrar o setor.");
+      if (!response.ok || !("data" in body)) {
+        const apiError = "error" in body ? body.error : undefined;
+        setErrorField(Object.keys(apiError?.fields ?? {})[0] ?? "");
+        setError(apiError?.message ?? "Não foi possível cadastrar o setor.");
         return;
       }
 
-      setSectors((current) => [body, ...current]);
-      setSuccess(`Setor "${body.name}" cadastrado com sucesso.`);
+      setSectors((current) => [body.data, ...current]);
+      setSuccess(`Setor "${body.data.name}" cadastrado com sucesso.`);
       closeModal();
     } catch {
-      setPending(false);
       setError("Não foi possível conectar ao servidor. Tente novamente.");
+    } finally {
+      setPending(false);
     }
   }
 
@@ -120,9 +168,9 @@ export default function Home() {
           <a className="park-nav-link" href="#">
             <i className="bi bi-speedometer2" /> Dashboard
           </a>
-          <a className="park-nav-link active" href="/" aria-current="page">
+          <Link className="park-nav-link active" href="/" aria-current="page">
             <i className="bi bi-building" /> Setores
-          </a>
+          </Link>
           <a className="park-nav-link" href="#">
             <i className="bi bi-p-circle" /> Reservas
           </a>
@@ -166,6 +214,12 @@ export default function Home() {
           </div>
         ) : null}
 
+        {loadError ? (
+          <div className="alert alert-danger" role="alert">
+            {loadError}
+          </div>
+        ) : null}
+
         <div className="card shadow-sm border-0">
           <div className="card-body p-0">
             {sectors.length === 0 ? (
@@ -190,8 +244,8 @@ export default function Home() {
                       <tr key={sector.id}>
                         <td className="fw-semibold">{sector.name}</td>
                         <td>{sector.location || "—"}</td>
-                        <td>{sector.quota}</td>
-                        <td>{sector.availableQuota}</td>
+                        <td>{sector.reservableQuota}</td>
+                        <td>{sector.availableSpots}</td>
                         <td>{money.format(sector.hourlyRate)}</td>
                       </tr>
                     ))}
@@ -234,6 +288,7 @@ export default function Home() {
                       className={`form-control${errorField === "name" ? " is-invalid" : ""}`}
                       value={name}
                       onChange={(event) => setName(event.target.value)}
+                      maxLength={100}
                     />
                   </div>
 
@@ -243,9 +298,10 @@ export default function Home() {
                     </label>
                     <input
                       id="sector-location"
-                      className="form-control"
+                      className={`form-control${errorField === "location" ? " is-invalid" : ""}`}
                       value={location}
                       onChange={(event) => setLocation(event.target.value)}
+                      maxLength={200}
                     />
                   </div>
 
@@ -257,9 +313,10 @@ export default function Home() {
                       <input
                         id="sector-quota"
                         type="number"
-                        className={`form-control${errorField === "quota" ? " is-invalid" : ""}`}
-                        value={quota}
-                        onChange={(event) => setQuota(event.target.value)}
+                        min="1"
+                        className={`form-control${errorField === "reservableQuota" ? " is-invalid" : ""}`}
+                        value={reservableQuota}
+                        onChange={(event) => setReservableQuota(event.target.value)}
                       />
                     </div>
                     <div className="col-md-6 mb-3">
