@@ -24,6 +24,12 @@ describe('AppController (e2e)', () => {
       create: jest.fn().mockResolvedValue(sectorEntity),
     },
   };
+  const validSectorPayload = {
+    name: 'Setor A',
+    location: 'Piso térreo',
+    reservableQuota: 20,
+    hourlyRate: 10,
+  };
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -45,45 +51,46 @@ describe('AppController (e2e)', () => {
       .expect('Hello World!');
   });
 
-  it('/api/sectors (GET) retorna a lista de setores', () => {
+  it('/api/sectors (GET) retorna a lista de setores em data como array', () => {
     return request(app.getHttpServer())
       .get('/api/sectors')
       .expect(200)
-      .expect({
-        data: [
-          {
-            id: sectorEntity.id,
-            name: sectorEntity.name,
-            location: sectorEntity.location,
-            reservableQuota: sectorEntity.reservableQuota,
-            availableSpots: sectorEntity.availableSpots,
-            hourlyRate: 10,
-            createdAt: createdAt.toISOString(),
-          },
-        ],
+      .expect(({ body }) => {
+        expect(Array.isArray(body.data)).toBe(true);
+        expect(body).toEqual({
+          data: [
+            {
+              id: sectorEntity.id,
+              name: sectorEntity.name,
+              location: sectorEntity.location,
+              reservableQuota: sectorEntity.reservableQuota,
+              availableSpots: sectorEntity.availableSpots,
+              hourlyRate: 10,
+              createdAt: createdAt.toISOString(),
+            },
+          ],
+        });
       });
   });
 
-  it('/api/sectors (POST) cria um setor', async () => {
+  it('/api/sectors (POST) cria um setor com id, createdAt e vagas disponíveis iguais à cota', async () => {
     await request(app.getHttpServer())
       .post('/api/sectors')
-      .send({
-        name: 'Setor A',
-        location: 'Piso térreo',
-        reservableQuota: 20,
-        hourlyRate: 10,
-      })
+      .send(validSectorPayload)
       .expect(201)
-      .expect({
-        data: {
+      .expect(({ body }) => {
+        expect(body.data).toMatchObject({
           id: sectorEntity.id,
           name: sectorEntity.name,
           location: sectorEntity.location,
           reservableQuota: sectorEntity.reservableQuota,
-          availableSpots: sectorEntity.availableSpots,
+          availableSpots: sectorEntity.reservableQuota,
           hourlyRate: 10,
           createdAt: createdAt.toISOString(),
-        },
+        });
+        expect(body.data.id).toBeDefined();
+        expect(body.data.createdAt).toBeDefined();
+        expect(body.data.availableSpots).toBe(body.data.reservableQuota);
       });
 
     expect(prismaService.sector.create).toHaveBeenCalledWith({
@@ -97,14 +104,12 @@ describe('AppController (e2e)', () => {
     });
   });
 
-  it('/api/sectors (POST) retorna erro padronizado para payload inválido', () => {
+  it('/api/sectors (POST) rejeita name vazio', () => {
     return request(app.getHttpServer())
       .post('/api/sectors')
       .send({
+        ...validSectorPayload,
         name: '',
-        location: 'Piso térreo',
-        reservableQuota: 0,
-        hourlyRate: 10,
       })
       .expect(400)
       .expect(({ body }) => {
@@ -114,10 +119,77 @@ describe('AppController (e2e)', () => {
             message: 'Dados inválidos.',
             fields: {
               name: 'O nome é obrigatório.',
+            },
+          },
+        });
+      });
+  });
+
+  it('/api/sectors (POST) rejeita name somente com espaços', () => {
+    return request(app.getHttpServer())
+      .post('/api/sectors')
+      .send({ ...validSectorPayload, name: '   ' })
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body.error.code).toBe('VALIDATION_ERROR');
+      });
+  });
+
+  it('/api/sectors (POST) rejeita location vazio', () => {
+    return request(app.getHttpServer())
+      .post('/api/sectors')
+      .send({ ...validSectorPayload, location: '' })
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body.error.code).toBe('VALIDATION_ERROR');
+      });
+  });
+
+  it('/api/sectors (POST) rejeita reservableQuota igual a zero', () => {
+    return request(app.getHttpServer())
+      .post('/api/sectors')
+      .send({ ...validSectorPayload, reservableQuota: 0 })
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Dados inválidos.',
+            fields: {
               reservableQuota: 'A cota de reservas deve ser no mínimo 1.',
             },
           },
         });
+      });
+  });
+
+  it('/api/sectors (POST) rejeita reservableQuota negativo', () => {
+    return request(app.getHttpServer())
+      .post('/api/sectors')
+      .send({ ...validSectorPayload, reservableQuota: -1 })
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body.error.code).toBe('VALIDATION_ERROR');
+      });
+  });
+
+  it('/api/sectors (POST) rejeita reservableQuota decimal', () => {
+    return request(app.getHttpServer())
+      .post('/api/sectors')
+      .send({ ...validSectorPayload, reservableQuota: 1.5 })
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body.error.code).toBe('VALIDATION_ERROR');
+      });
+  });
+
+  it('/api/sectors (POST) rejeita hourlyRate negativo', () => {
+    return request(app.getHttpServer())
+      .post('/api/sectors')
+      .send({ ...validSectorPayload, hourlyRate: -0.01 })
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body.error.code).toBe('VALIDATION_ERROR');
       });
   });
 
