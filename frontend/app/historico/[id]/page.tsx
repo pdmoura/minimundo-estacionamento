@@ -72,6 +72,11 @@ export default function HistoricoDetalhePage() {
               <div className="small text-secondary">
                 <FormatDate value={evento.occurredAt} />
               </div>
+              {evento.originDescription && (
+                <div className="small text-secondary fst-italic">
+                  Originado por: {evento.originDescription}
+                </div>
+              )}
             </li>
           ))}
         </ol>

@@ -25,6 +25,7 @@ export type HistoryEvent = {
   waitlistEntryId?: string;
   description: string;
   originEventId?: string;
+  originDescription?: string;
 };
 
 export type CreateReservationInput = {

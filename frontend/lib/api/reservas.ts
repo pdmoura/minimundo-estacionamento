@@ -154,6 +154,9 @@ export async function obterHistorico(id: string): Promise<{
       occurredAt: evento.occurredAt,
       description: evento.description,
       ...(evento.originEventId ? { originEventId: evento.originEventId } : {}),
+      ...(evento.originDescription
+        ? { originDescription: evento.originDescription }
+        : {}),
     })),
   };
 }

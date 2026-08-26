@@ -49,8 +49,6 @@ export class ErroCadastroSetor extends Error {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-const RESERVAS_ATIVAS_MOCK = 127;
-const NA_LISTA_DE_ESPERA_MOCK = 23;
 
 function paraSetor(sector: SectorApi): Setor {
   return {
@@ -98,10 +96,46 @@ export async function criarSetor(input: CriarSetorInput): Promise<Setor> {
   return paraSetor(body.data);
 }
 
+async function contarReservasAtivas(): Promise<number> {
+  const resposta = await fetch(`${API_BASE_URL}/api/reservations`);
+  if (!resposta.ok) {
+    throw new Error("Não foi possível contar as reservas ativas.");
+  }
+
+  const { data }: { data: Array<{ status: string }> } = await resposta.json();
+  return data.filter((reserva) => reserva.status === "ACTIVE").length;
+}
+
+async function contarNaListaDeEspera(setorIds: string[]): Promise<number> {
+  const filas = await Promise.all(
+    setorIds.map(async (setorId) => {
+      const resposta = await fetch(
+        `${API_BASE_URL}/api/sectors/${setorId}/waitlist`,
+      );
+      if (!resposta.ok) {
+        throw new Error("Não foi possível contar a lista de espera.");
+      }
+
+      const { data }: { data: Array<{ status: string }> } =
+        await resposta.json();
+      return data.filter((entrada) => entrada.status === "WAITING").length;
+    }),
+  );
+
+  return filas.reduce((total, quantidade) => total + quantidade, 0);
+}
+
 export async function obterResumoDashboard(): Promise<ResumoDashboard> {
   const setores = await listarSetores();
 
-  const ocupacoes = setores.map((setor) => setor.vagasOcupadas / setor.cotaVagas);
+  const [reservasAtivas, naListaDeEspera] = await Promise.all([
+    contarReservasAtivas(),
+    contarNaListaDeEspera(setores.map((setor) => setor.id)),
+  ]);
+
+  const ocupacoes = setores.map(
+    (setor) => setor.vagasOcupadas / setor.cotaVagas,
+  );
   const taxaOcupacaoMedia =
     ocupacoes.length > 0
       ? ocupacoes.reduce((soma, valor) => soma + valor, 0) / ocupacoes.length
@@ -109,8 +143,8 @@ export async function obterResumoDashboard(): Promise<ResumoDashboard> {
 
   return {
     setoresCadastrados: setores.length,
-    reservasAtivas: RESERVAS_ATIVAS_MOCK,
-    naListaDeEspera: NA_LISTA_DE_ESPERA_MOCK,
+    reservasAtivas,
+    naListaDeEspera,
     taxaOcupacaoMedia,
     ocupacaoPorSetor: setores,
   };

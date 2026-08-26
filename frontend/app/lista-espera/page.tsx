@@ -45,6 +45,7 @@ export default function ListaEsperaPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial
     void carregar();
   }, []);
 
@@ -127,11 +128,11 @@ export default function ListaEsperaPage() {
     }
   }
 
-  async function handleSair(id: string) {
+  async function handleSair(sectorId: string, id: string) {
     setSaindoId(id);
     setErro(null);
     try {
-      await sairDaListaEspera(id);
+      await sairDaListaEspera(sectorId, id);
       setSucesso("Placa removida da lista de espera.");
       await carregar();
     } catch (requestError) {
@@ -276,7 +277,7 @@ export default function ListaEsperaPage() {
                               type="button"
                               className="btn btn-sm btn-outline-danger"
                               disabled={saindoId === entrada.id}
-                              onClick={() => void handleSair(entrada.id)}
+                              onClick={() => void handleSair(entrada.sectorId, entrada.id)}
                             >
                               {saindoId === entrada.id ? "Saindo..." : "Sair da lista"}
                             </button>

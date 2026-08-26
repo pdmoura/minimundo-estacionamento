@@ -179,6 +179,7 @@ export class WaitlistService {
   async promoteFirstWaiting(
     tx: Prisma.TransactionClient,
     sectorId: string,
+    originEventId?: string,
   ): Promise<{ entry: WaitlistEntry; reservation: Reservation } | null> {
     const entry = await tx.waitlistEntry.findFirst({
       where: { sectorId, status: WaitlistStatus.WAITING },
@@ -202,10 +203,15 @@ export class WaitlistService {
       },
     });
 
+    // A promoção carrega os dois lados: o waitlistEntryId liga a espera que
+    // acabou, e o reservationId é a ponte que faz esses eventos aparecerem no
+    // histórico da reserva nova. Sem ele, a espera some do histórico.
     await tx.historyEvent.create({
       data: {
         type: HistoryEventType.WAITLIST_PROMOTED,
         waitlistEntryId: promotedEntry.id,
+        reservationId: reservation.id,
+        ...(originEventId ? { originEventId } : {}),
       },
     });
     await tx.historyEvent.create({

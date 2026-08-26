@@ -18,6 +18,7 @@ describe('ReservationsService', () => {
     status: ReservationStatus.ACTIVE,
     createdAt: now,
   };
+  const cancellationEventId = 'a1b2c3d4-0000-4000-8000-000000000001';
   const transactionClient = {
     sector: {
       findUnique: jest.fn(),
@@ -64,7 +65,9 @@ describe('ReservationsService', () => {
       { id: reservation.sectorId },
     ]);
     transactionClient.reservation.create.mockResolvedValue(reservation);
-    transactionClient.historyEvent.create.mockResolvedValue({});
+    transactionClient.historyEvent.create.mockResolvedValue({
+      id: cancellationEventId,
+    });
 
     await expect(service.create(payload)).resolves.toMatchObject({
       id: reservation.id,
@@ -103,7 +106,9 @@ describe('ReservationsService', () => {
     ]);
     waitlistService.promoteFirstWaiting.mockResolvedValue(null);
     transactionClient.sector.update.mockResolvedValue({});
-    transactionClient.historyEvent.create.mockResolvedValue({});
+    transactionClient.historyEvent.create.mockResolvedValue({
+      id: cancellationEventId,
+    });
 
     await expect(service.cancel(reservation.id)).resolves.toMatchObject({
       id: reservation.id,
@@ -116,6 +121,7 @@ describe('ReservationsService', () => {
     expect(waitlistService.promoteFirstWaiting).toHaveBeenCalledWith(
       transactionClient,
       reservation.sectorId,
+      cancellationEventId,
     );
   });
 
@@ -124,7 +130,9 @@ describe('ReservationsService', () => {
       { ...reservation, status: ReservationStatus.CANCELLED },
     ]);
     waitlistService.promoteFirstWaiting.mockResolvedValue({});
-    transactionClient.historyEvent.create.mockResolvedValue({});
+    transactionClient.historyEvent.create.mockResolvedValue({
+      id: cancellationEventId,
+    });
 
     await expect(service.cancel(reservation.id)).resolves.toMatchObject({
       id: reservation.id,
@@ -133,6 +141,7 @@ describe('ReservationsService', () => {
     expect(waitlistService.promoteFirstWaiting).toHaveBeenCalledWith(
       transactionClient,
       reservation.sectorId,
+      cancellationEventId,
     );
     expect(transactionClient.sector.update).not.toHaveBeenCalled();
   });

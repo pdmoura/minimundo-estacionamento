@@ -140,24 +140,31 @@ export class ReservationsService {
       }
 
       const updated = updatedReservations[0];
+
+      // O cancelamento é gravado antes da promoção para que a promoção possa
+      // apontar de volta para ele via originEventId, que é o que responde
+      // "qual cancelamento liberou esta vaga" no histórico.
+      const cancellationEvent = await tx.historyEvent.create({
+        data: {
+          type: HistoryEventType.RESERVATION_CANCELLED,
+          reservationId: updated.id,
+        },
+      });
+
       const promotion = await this.waitlistService.promoteFirstWaiting(
         tx,
         updated.sectorId,
+        cancellationEvent.id,
       );
 
+      // Quando alguém é promovido, a vaga passa direto para essa pessoa e a
+      // cota do setor não muda.
       if (!promotion) {
         await tx.sector.update({
           where: { id: updated.sectorId },
           data: { availableSpots: { increment: 1 } },
         });
       }
-
-      await tx.historyEvent.create({
-        data: {
-          type: HistoryEventType.RESERVATION_CANCELLED,
-          reservationId: updated.id,
-        },
-      });
 
       return {
         ...updated,

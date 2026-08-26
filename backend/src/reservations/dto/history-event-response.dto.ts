@@ -29,9 +29,7 @@ export class HistoryEventResponseDto {
       description: HISTORY_EVENT_LABELS[event.type],
       occurredAt: event.occurredAt.toISOString(),
       originEventId: event.originEventId,
-      originDescription: origin
-        ? `${HISTORY_EVENT_LABELS[origin.type]} em ${origin.occurredAt.toISOString()}`
-        : null,
+      originDescription: origin ? HISTORY_EVENT_LABELS[origin.type] : null,
     };
   }
 }
