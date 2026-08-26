@@ -7,7 +7,6 @@ import {
   HistoryEventType,
   Prisma,
   ReservationStatus,
-  type Reservation,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
@@ -16,6 +15,16 @@ import { ReservationResponseDto } from './dto/reservation-response.dto';
 @Injectable()
 export class ReservationsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async findAll(): Promise<ReservationResponseDto[]> {
+    const reservations = await this.prisma.reservation.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return reservations.map((reservation) =>
+      ReservationResponseDto.fromEntity(reservation),
+    );
+  }
 
   async create(data: CreateReservationDto): Promise<ReservationResponseDto> {
     const expectedArrivalAt = new Date(data.expectedArrivalAt);
@@ -96,34 +105,24 @@ export class ReservationsService {
 
   async cancel(id: string): Promise<ReservationResponseDto> {
     const reservation = await this.prisma.$transaction(async (tx) => {
-      const updatedReservations = await tx.$queryRaw<Reservation[]>`
-        UPDATE "Reservation"
-        SET "status" = 'CANCELLED'
-        WHERE "id" = ${id}::uuid
-          AND "status" = 'ACTIVE'
-        RETURNING *
-      `;
+      const { count } = await tx.reservation.updateMany({
+        where: { id, status: ReservationStatus.ACTIVE },
+        data: {
+          status: ReservationStatus.CANCELLED,
+          cancelledAt: new Date(),
+        },
+      });
 
-      if (updatedReservations.length === 0) {
-        const existing = await tx.reservation.findUnique({
-          where: { id },
-          select: { id: true },
-        });
-
-        if (!existing) {
-          throw new NotFoundException({
-            code: 'RESERVATION_NOT_FOUND',
-            message: 'Reserva não encontrada.',
-          });
-        }
-
+      if (count === 0) {
         throw new BadRequestException({
           code: 'RESERVATION_ALREADY_CANCELLED',
-          message: 'A reserva já foi cancelada.',
+          message: 'Reserva já cancelada.',
         });
       }
 
-      const updated = updatedReservations[0];
+      const updated = await tx.reservation.findUniqueOrThrow({
+        where: { id },
+      });
 
       await tx.sector.update({
         where: { id: updated.sectorId },
@@ -137,10 +136,7 @@ export class ReservationsService {
         },
       });
 
-      return {
-        ...updated,
-        status: ReservationStatus.CANCELLED,
-      };
+      return updated;
     });
 
     return ReservationResponseDto.fromEntity(reservation);

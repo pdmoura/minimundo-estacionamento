@@ -45,6 +45,7 @@ model Reservation {
   expectedArrivalAt DateTime
   status            ReservationStatus @default(ACTIVE)
   createdAt         DateTime          @default(now())
+  cancelledAt       DateTime?
   sector            Sector            @relation(fields: [sectorId], references: [id])
   historyEvents     HistoryEvent[]
 

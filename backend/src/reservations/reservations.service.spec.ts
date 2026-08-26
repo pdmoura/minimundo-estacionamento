@@ -16,6 +16,7 @@ describe('ReservationsService', () => {
     expectedArrivalAt: new Date('2099-08-27T15:00:00.000Z'),
     status: ReservationStatus.ACTIVE,
     createdAt: now,
+    cancelledAt: null,
   };
   const transactionClient = {
     sector: {
@@ -24,7 +25,8 @@ describe('ReservationsService', () => {
     },
     reservation: {
       create: jest.fn(),
-      findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      updateMany: jest.fn(),
     },
     historyEvent: {
       create: jest.fn(),
@@ -32,6 +34,9 @@ describe('ReservationsService', () => {
     $queryRaw: jest.fn(),
   };
   const prisma = {
+    reservation: {
+      findMany: jest.fn(),
+    },
     $transaction: jest.fn(
       async (
         callback: (client: typeof transactionClient) => Promise<unknown>,
@@ -47,6 +52,17 @@ describe('ReservationsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('lista reservas da mais recente para a mais antiga', async () => {
+    prisma.reservation.findMany.mockResolvedValue([reservation]);
+
+    await expect(service.findAll()).resolves.toEqual([
+      expect.objectContaining({ id: reservation.id }),
+    ]);
+    expect(prisma.reservation.findMany).toHaveBeenCalledWith({
+      orderBy: { createdAt: 'desc' },
+    });
   });
 
   it('cria a reserva após decrementar uma vaga atomicamente', async () => {
@@ -91,9 +107,12 @@ describe('ReservationsService', () => {
   });
 
   it('cancela uma reserva ativa e devolve uma vaga', async () => {
-    transactionClient.$queryRaw.mockResolvedValue([
-      { ...reservation, status: ReservationStatus.CANCELLED },
-    ]);
+    transactionClient.reservation.updateMany.mockResolvedValue({ count: 1 });
+    transactionClient.reservation.findUniqueOrThrow.mockResolvedValue({
+      ...reservation,
+      status: ReservationStatus.CANCELLED,
+      cancelledAt: now,
+    });
     transactionClient.sector.update.mockResolvedValue({});
     transactionClient.historyEvent.create.mockResolvedValue({});
 
@@ -108,10 +127,7 @@ describe('ReservationsService', () => {
   });
 
   it('recusa o segundo cancelamento', async () => {
-    transactionClient.$queryRaw.mockResolvedValue([]);
-    transactionClient.reservation.findUnique.mockResolvedValue({
-      id: reservation.id,
-    });
+    transactionClient.reservation.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(service.cancel(reservation.id)).rejects.toBeInstanceOf(
       BadRequestException,

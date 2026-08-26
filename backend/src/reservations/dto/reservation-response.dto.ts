@@ -10,6 +10,7 @@ export class ReservationResponseDto {
   expectedArrivalAt: string;
   status: ReservationStatus;
   createdAt: string;
+  cancelledAt: string | null;
 
   static fromEntity(reservation: Reservation): ReservationResponseDto {
     return {
@@ -19,6 +20,7 @@ export class ReservationResponseDto {
       expectedArrivalAt: reservation.expectedArrivalAt.toISOString(),
       status: reservation.status,
       createdAt: reservation.createdAt.toISOString(),
+      cancelledAt: reservation.cancelledAt?.toISOString() ?? null,
     };
   }
 }
