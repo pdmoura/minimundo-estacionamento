@@ -1,9 +1,10 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import {
   ReservationStatus,
   type Reservation,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { WaitlistService } from '../waitlist/waitlist.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ReservationsService } from './reservations.service';
 
@@ -38,7 +39,13 @@ describe('ReservationsService', () => {
       ) => callback(transactionClient),
     ),
   };
-  const service = new ReservationsService(prisma as unknown as PrismaService);
+  const waitlistService = {
+    promoteFirstWaiting: jest.fn(),
+  };
+  const service = new ReservationsService(
+    prisma as unknown as PrismaService,
+    waitlistService as unknown as WaitlistService,
+  );
   const payload: CreateReservationDto = {
     plate: 'ABC1D23',
     sectorId: reservation.sectorId,
@@ -90,10 +97,11 @@ describe('ReservationsService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('cancela uma reserva ativa e devolve uma vaga', async () => {
+  it('cancela uma reserva ativa e devolve uma vaga quando nÃ£o hÃ¡ fila', async () => {
     transactionClient.$queryRaw.mockResolvedValue([
       { ...reservation, status: ReservationStatus.CANCELLED },
     ]);
+    waitlistService.promoteFirstWaiting.mockResolvedValue(null);
     transactionClient.sector.update.mockResolvedValue({});
     transactionClient.historyEvent.create.mockResolvedValue({});
 
@@ -105,6 +113,28 @@ describe('ReservationsService', () => {
       where: { id: reservation.sectorId },
       data: { availableSpots: { increment: 1 } },
     });
+    expect(waitlistService.promoteFirstWaiting).toHaveBeenCalledWith(
+      transactionClient,
+      reservation.sectorId,
+    );
+  });
+
+  it('cancela uma reserva ativa e promove a primeira entrada da fila', async () => {
+    transactionClient.$queryRaw.mockResolvedValue([
+      { ...reservation, status: ReservationStatus.CANCELLED },
+    ]);
+    waitlistService.promoteFirstWaiting.mockResolvedValue({});
+    transactionClient.historyEvent.create.mockResolvedValue({});
+
+    await expect(service.cancel(reservation.id)).resolves.toMatchObject({
+      id: reservation.id,
+      status: ReservationStatus.CANCELLED,
+    });
+    expect(waitlistService.promoteFirstWaiting).toHaveBeenCalledWith(
+      transactionClient,
+      reservation.sectorId,
+    );
+    expect(transactionClient.sector.update).not.toHaveBeenCalled();
   });
 
   it('recusa o segundo cancelamento', async () => {
@@ -117,5 +147,17 @@ describe('ReservationsService', () => {
       BadRequestException,
     );
     expect(transactionClient.sector.update).not.toHaveBeenCalled();
+    expect(waitlistService.promoteFirstWaiting).not.toHaveBeenCalled();
+  });
+
+  it('recusa o cancelamento de uma reserva inexistente sem promover ninguÃ©m', async () => {
+    transactionClient.$queryRaw.mockResolvedValue([]);
+    transactionClient.reservation.findUnique.mockResolvedValue(null);
+
+    await expect(service.cancel(reservation.id)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(transactionClient.sector.update).not.toHaveBeenCalled();
+    expect(waitlistService.promoteFirstWaiting).not.toHaveBeenCalled();
   });
 });
