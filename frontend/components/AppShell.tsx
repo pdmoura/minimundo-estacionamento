@@ -72,14 +72,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-
-        <div className="d-flex align-items-center gap-2 px-1 pt-3 border-top border-light border-opacity-25">
-          <span className="park-avatar bg-primary">AD</span>
-          <div className="lh-sm">
-            <div className="fw-semibold small">Admin</div>
-            <div className="small text-white-50">Administrador</div>
-          </div>
-        </div>
       </aside>
 
       <main className="park-main flex-grow-1 p-4 p-lg-5">{children}</main>
