@@ -27,7 +27,7 @@ export class CreateSectorDto {
   location: string;
 
   @IsInt({ message: 'A cota de reservas deve ser um número inteiro.' })
-  @Min(0, { message: 'A cota de reservas não pode ser negativa.' })
+  @Min(1, { message: 'A cota de reservas deve ser no mínimo 1.' })
   reservableQuota: number;
 
   @IsNumber(

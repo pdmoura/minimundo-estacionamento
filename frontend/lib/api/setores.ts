@@ -25,6 +25,16 @@ type SectorApi = {
   createdAt: string;
 };
 
+export type CriarSetorInput = {
+  name: string;
+  location: string;
+  reservableQuota: number;
+  hourlyRate: number;
+};
+
+type ApiEnvelope<T> = { data: T };
+type ApiErrorEnvelope = { error?: { message?: string } };
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -50,6 +60,27 @@ export async function listarSetores(): Promise<Setor[]> {
 
   const { data }: { data: SectorApi[] } = await resposta.json();
   return data.map(paraSetor);
+}
+
+export async function criarSetor(input: CriarSetorInput): Promise<Setor> {
+  const resposta = await fetch(`${API_BASE_URL}/api/sectors`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const body = (await resposta.json()) as
+    | ApiEnvelope<SectorApi>
+    | ApiErrorEnvelope;
+
+  if (!resposta.ok || !("data" in body)) {
+    throw new Error(
+      "error" in body
+        ? body.error?.message ?? "Não foi possível cadastrar o setor."
+        : "Não foi possível cadastrar o setor.",
+    );
+  }
+
+  return paraSetor(body.data);
 }
 
 export async function obterResumoDashboard(): Promise<ResumoDashboard> {

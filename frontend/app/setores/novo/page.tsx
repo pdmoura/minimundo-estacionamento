@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { criarSetor } from "@/lib/api/setores";
 
 export default function NovoSetorPage() {
   const router = useRouter();
@@ -26,13 +27,19 @@ export default function NovoSetorPage() {
       return;
     }
 
-    if (!Number.isInteger(quotaNumber) || quotaNumber < 1) {
+    if (!location.trim()) {
+      setErrorField("location");
+      setError("Informe a localização do setor.");
+      return;
+    }
+
+    if (!quota.trim() || !Number.isInteger(quotaNumber) || quotaNumber < 1) {
       setErrorField("quota");
       setError("A cota de vagas deve ser no mínimo 1.");
       return;
     }
 
-    if (!Number.isFinite(rateNumber) || rateNumber < 0) {
+    if (!hourlyRate.trim() || !Number.isFinite(rateNumber) || rateNumber < 0) {
       setErrorField("hourlyRate");
       setError("A tarifa por hora não pode ser negativa.");
       return;
@@ -43,30 +50,21 @@ export default function NovoSetorPage() {
     setErrorField("");
 
     try {
-      const response = await fetch("/api/sectors", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          location,
-          quota: quotaNumber,
-          hourlyRate: rateNumber,
-        }),
+      await criarSetor({
+        name: name.trim(),
+        location: location.trim(),
+        reservableQuota: quotaNumber,
+        hourlyRate: rateNumber,
       });
-
-      const body = await response.json();
-      setPending(false);
-
-      if (!response.ok) {
-        setErrorField(body.field ?? "");
-        setError(body.error ?? "Não foi possível cadastrar o setor.");
-        return;
-      }
-
       router.push("/setores");
-    } catch {
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Não foi possível conectar ao servidor. Tente novamente.",
+      );
+    } finally {
       setPending(false);
-      setError("Não foi possível conectar ao servidor. Tente novamente.");
     }
   }
 
@@ -93,6 +91,7 @@ export default function NovoSetorPage() {
                 className={`form-control${errorField === "name" ? " is-invalid" : ""}`}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
+                maxLength={100}
               />
             </div>
 
@@ -102,9 +101,10 @@ export default function NovoSetorPage() {
               </label>
               <input
                 id="sector-location"
-                className="form-control"
+                className={`form-control${errorField === "location" ? " is-invalid" : ""}`}
                 value={location}
                 onChange={(event) => setLocation(event.target.value)}
+                maxLength={200}
               />
             </div>
 
@@ -116,6 +116,7 @@ export default function NovoSetorPage() {
                 <input
                   id="sector-quota"
                   type="number"
+                  min="1"
                   className={`form-control${errorField === "quota" ? " is-invalid" : ""}`}
                   value={quota}
                   onChange={(event) => setQuota(event.target.value)}

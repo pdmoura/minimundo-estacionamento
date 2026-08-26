@@ -103,7 +103,7 @@ describe('AppController (e2e)', () => {
       .send({
         name: '',
         location: 'Piso térreo',
-        reservableQuota: -1,
+        reservableQuota: 0,
         hourlyRate: 10,
       })
       .expect(400)
@@ -114,7 +114,7 @@ describe('AppController (e2e)', () => {
             message: 'Dados inválidos.',
             fields: {
               name: 'O nome é obrigatório.',
-              reservableQuota: 'A cota de reservas não pode ser negativa.',
+              reservableQuota: 'A cota de reservas deve ser no mínimo 1.',
             },
           },
         });
