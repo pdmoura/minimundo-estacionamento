@@ -107,7 +107,9 @@ describe('WaitlistService', () => {
       id: sectorId,
       availableSpots: 0,
     });
-    transactionClient.reservation.findFirst.mockResolvedValue({ id: reservation.id });
+    transactionClient.reservation.findFirst.mockResolvedValue({
+      id: reservation.id,
+    });
 
     await expect(service.join(sectorId, payload)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -121,7 +123,9 @@ describe('WaitlistService', () => {
       availableSpots: 0,
     });
     transactionClient.reservation.findFirst.mockResolvedValue(null);
-    transactionClient.waitlistEntry.findFirst.mockResolvedValue({ id: entry.id });
+    transactionClient.waitlistEntry.findFirst.mockResolvedValue({
+      id: entry.id,
+    });
 
     await expect(service.join(sectorId, payload)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -195,10 +199,7 @@ describe('WaitlistService', () => {
     transactionClient.historyEvent.create.mockResolvedValue({});
 
     await expect(
-      service.promoteFirstWaiting(
-        transactionClient as never,
-        sectorId,
-      ),
+      service.promoteFirstWaiting(transactionClient as never, sectorId),
     ).resolves.toMatchObject({
       entry: { status: WaitlistStatus.PROMOTED },
       reservation: { status: ReservationStatus.ACTIVE },

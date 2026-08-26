@@ -1,4 +1,8 @@
-import type { HistoryEvent, Reservation } from "@/lib/reservations/types";
+import type {
+  HistoryEvent,
+  HistoryEventType,
+  Reservation,
+} from "@/lib/reservations/types";
 import { listarSetores, type Setor } from "@/lib/api/setores";
 
 type ApiEnvelope<T> = { data: T };
@@ -110,18 +114,46 @@ export async function listarSetoresReserva(): Promise<Setor[]> {
  * continua servido pelo mock local (app/api/reservations/[id]/history)
  * até esse endpoint ser trazido de feat/estc5-reservation-history.
  */
+type HistoryEventApi = {
+  id: string;
+  type: HistoryEventType;
+  occurredAt: string;
+  description: string;
+  originEventId: string | null;
+  originDescription: string | null;
+};
+
 export async function obterHistorico(id: string): Promise<{
   reservation: Reservation;
   events: HistoryEvent[];
 }> {
-  const resposta = await fetch(`/api/reservations/${id}/history`);
+  const [reservas, resposta] = await Promise.all([
+    listarReservas(),
+    fetch(`${API_BASE_URL}/api/reservations/${id}/history`),
+  ]);
+
   if (resposta.status === 404) {
     throw new Error("Reserva não encontrada.");
   }
   if (!resposta.ok) {
     throw new Error("Não foi possível carregar o histórico.");
   }
-  const { data }: ApiEnvelope<{ reservation: Reservation; events: HistoryEvent[] }> =
-    await resposta.json();
-  return data;
+
+  const reservation = reservas.find((item) => item.id === id);
+  if (!reservation) {
+    throw new Error("Reserva não encontrada.");
+  }
+
+  const { data }: ApiEnvelope<HistoryEventApi[]> = await resposta.json();
+
+  return {
+    reservation,
+    events: data.map((evento) => ({
+      id: evento.id,
+      type: evento.type,
+      occurredAt: evento.occurredAt,
+      description: evento.description,
+      ...(evento.originEventId ? { originEventId: evento.originEventId } : {}),
+    })),
+  };
 }

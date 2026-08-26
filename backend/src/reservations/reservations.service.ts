@@ -7,11 +7,13 @@ import {
   HistoryEventType,
   Prisma,
   ReservationStatus,
+  type HistoryEvent,
   type Reservation,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WaitlistService } from '../waitlist/waitlist.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
+import { HistoryEventResponseDto } from './dto/history-event-response.dto';
 import { ReservationResponseDto } from './dto/reservation-response.dto';
 
 @Injectable()
@@ -164,5 +166,85 @@ export class ReservationsService {
     });
 
     return ReservationResponseDto.fromEntity(reservation);
+  }
+
+  async getHistory(id: string): Promise<HistoryEventResponseDto[]> {
+    const reservation = await this.prisma.reservation.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!reservation) {
+      throw new NotFoundException({
+        code: 'RESERVATION_NOT_FOUND',
+        message: 'Reserva não encontrada.',
+      });
+    }
+
+    const events = await this.collectEvents(id);
+    events.sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+
+    const origins = await this.originsFor(events);
+
+    return events.map((event) =>
+      HistoryEventResponseDto.fromEntity(
+        event,
+        event.originEventId ? origins.get(event.originEventId) : undefined,
+      ),
+    );
+  }
+
+  // Uma reserva que veio da lista de espera carrega a história da espera que
+  // a precedeu. Esses eventos penduram no WaitlistEntry, não na Reservation,
+  // então só entram se a gente atravessar a ponte pelo evento de promoção.
+  // Sem promoção, a busca extra nem acontece.
+  private async collectEvents(reservationId: string): Promise<HistoryEvent[]> {
+    const direct = await this.prisma.historyEvent.findMany({
+      where: { reservationId },
+    });
+
+    const waitlistEntryIds = [
+      ...new Set(
+        direct
+          .map((event) => event.waitlistEntryId)
+          .filter((entryId): entryId is string => entryId !== null),
+      ),
+    ];
+
+    if (waitlistEntryIds.length === 0) {
+      return direct;
+    }
+
+    const fromWaitlist = await this.prisma.historyEvent.findMany({
+      where: { waitlistEntryId: { in: waitlistEntryIds } },
+    });
+
+    const seen = new Set(direct.map((event) => event.id));
+
+    return [...direct, ...fromWaitlist.filter((event) => !seen.has(event.id))];
+  }
+
+  // "A promoção indica qual cancelamento a originou": originEventId aponta
+  // para o evento que disparou a promoção. Resolvemos em lote para descrever.
+  private async originsFor(
+    events: HistoryEvent[],
+  ): Promise<Map<string, HistoryEvent>> {
+    const originIds = [
+      ...new Set(
+        events
+          .map((event) => event.originEventId)
+          .filter((originId): originId is string => originId !== null),
+      ),
+    ];
+
+    if (originIds.length === 0) {
+      return new Map();
+    }
+
+    const origins = await this.prisma.historyEvent.findMany({
+      where: { id: { in: originIds } },
+    });
+
+    return new Map(origins.map((origin) => [origin.id, origin]));
   }
 }
