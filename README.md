@@ -6,6 +6,27 @@
 docker compose up -d
 ```
 
+### Migrations
+
+Desenvolvimento local:
+
+```bash
+docker compose up -d
+cd backend
+npx prisma migrate dev
+```
+
+Banco remoto/Neon:
+
+```text
+Definir DATABASE_URL com a URL fornecida pelo Neon.
+```
+
+```bash
+cd backend
+npx prisma migrate deploy
+```
+
 ## Frontend
 
 ```bash
